@@ -9,7 +9,7 @@ export const BBX_UTM = [-665232.623867248767, 1767530.945019772742, 341128.74127
 export const CELL_SIZE = [948.502700081797570, 948.502700081797570]; // EPSG:3857 metres/pixel
 
 export const CLASS_NULL = 65535;
-export const TIFF_URL = './landcover_3857.tiff';
+export const TIFF_URL = `${import.meta.env.BASE_URL}landcover_3857.tiff`;
 
 export const DEFAULT_MAX_TIME_HOURS = 3;
 export const TIME_SLICE_MS = 80;   // Dijkstra compute budget per step() call
