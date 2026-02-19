@@ -1,26 +1,39 @@
-import { DEFAULT_MODEL, DEFAULT_MAX_TIME_HOURS, TIFF_URL, TIME_SLICE_MS, RENDER_BUDGET_MS } from './config.js';
-import { loadRaster, buildNodes, renderLandcoverCanvas } from './gis/raster.js';
-import { latLngToPix, pixToLngLat, setGeoref } from './gis/projection.js';
-import { ImageGraph } from './analysis/graph.js';
-import { Dijkstra } from './analysis/dijkstra.js';
-import { createMap, updateIsolineLayer, pauseTravelTimeCanvas, playTravelTimeCanvas } from './ui/map.js';
-import { initPanel, setStatus } from './ui/panel.js';
-import { initModelTable } from './ui/table.js';
-import { contours } from 'd3-contour';
-import chroma from 'chroma-js';
+import {
+  DEFAULT_MODEL,
+  DEFAULT_MAX_TIME_HOURS,
+  TIFF_URL,
+  TIME_SLICE_MS,
+  RENDER_BUDGET_MS,
+} from "./config.js";
+import { loadRaster, buildNodes, renderLandcoverCanvas } from "./gis/raster.js";
+import { latLngToPix, pixToLngLat, setGeoref } from "./gis/projection.js";
+import { ImageGraph } from "./analysis/graph.js";
+import { Dijkstra } from "./analysis/dijkstra.js";
+import {
+  createMap,
+  updateIsolineLayer,
+  pauseTravelTimeCanvas,
+  playTravelTimeCanvas,
+} from "./ui/map.js";
+import { initPanel, setStatus } from "./ui/panel.js";
+import { initModelTable } from "./ui/table.js";
+import { contours } from "d3-contour";
+import chroma from "chroma-js";
 
 // ─── Color ramp for travel time overlay (near → far: red → orange → blue) ────
-const TT_COLOR_LUT = chroma.scale(['#fd01f9','#d53e4f', '#fdae61', '#3288bd','#FFF']).colors(256, 'rgb');
+const TT_COLOR_LUT = chroma
+  .scale(["#253494", "#2c7fb8", "#41b6c4", "#7fcdbb", "#c7e9b4", "#ffffcc"])
+  .colors(256, "rgb");
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let model = DEFAULT_MODEL.map(r => ({ ...r }));
-let rasterData = null;   // { width, height, raster }
+let model = DEFAULT_MODEL.map((r) => ({ ...r }));
+let rasterData = null; // { width, height, raster }
 let nodes = null;
 
 // Off-screen canvases passed to MapLibre as raster sources
-const landcoverCanvas  = document.createElement('canvas');
-const traveltimeCanvas = document.createElement('canvas');
+const landcoverCanvas = document.createElement("canvas");
+const traveltimeCanvas = document.createElement("canvas");
 
 // Travel-time canvas state
 let ttCtx = null;
@@ -32,27 +45,29 @@ let currentCatchment = null;
 // Computation context (Dijkstra loop state)
 const computeCtx = {
   dijkstra: null,
-  graph:    null,
+  graph: null,
   currentY: 0,
-  yDone:    -1,
-  timerId:  null,
+  yDone: -1,
+  timerId: null,
 };
 
 // ─── UI references ────────────────────────────────────────────────────────────
 
 initPanel();
 
-const maxTimeInput = document.getElementById('maxTimeHour');
-const btnDownload  = document.getElementById('btnDownload');
+const maxTimeInput = document.getElementById("maxTimeHour");
+const btnDownload = document.getElementById("btnDownload");
 
-btnDownload.addEventListener('click', () => {
+btnDownload.addEventListener("click", () => {
   if (!currentCatchment) return;
-  const blob = new Blob([JSON.stringify(currentCatchment)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.download = 'travel_time_catchment.geojson';
-  a.href     = url;
-  a.target   = '_blank';
+  const blob = new Blob([JSON.stringify(currentCatchment)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.download = "travel_time_catchment.geojson";
+  a.href = url;
+  a.target = "_blank";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -61,40 +76,54 @@ btnDownload.addEventListener('click', () => {
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
 
-const map = createMap('map', landcoverCanvas, traveltimeCanvas, {
+const map = createMap("map", landcoverCanvas, traveltimeCanvas, {
   onHover: handleHover,
   onClick: handleClick,
 });
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
-setStatus('Loading data…');
+setStatus("Loading data…");
 
-loadRaster(TIFF_URL).then(data => {
-  rasterData = data;
-  setGeoref(data);   // update projection math from the TIFF's own geotransform
-  nodes = buildNodes(data.raster, model);
-  renderLandcoverCanvas(landcoverCanvas, data.width, data.height, data.raster, model);
-  resetTravelTimeCanvas();
-  setStatus(null);
+loadRaster(TIFF_URL)
+  .then((data) => {
+    rasterData = data;
+    setGeoref(data); // update projection math from the TIFF's own geotransform
+    nodes = buildNodes(data.raster, model);
+    renderLandcoverCanvas(
+      landcoverCanvas,
+      data.width,
+      data.height,
+      data.raster,
+      model,
+    );
+    resetTravelTimeCanvas();
+    setStatus(null);
 
-  initModelTable('tblModel', model, updatedModel => {
-    model = updatedModel;
-    nodes = buildNodes(rasterData.raster, model);
-    renderLandcoverCanvas(landcoverCanvas, rasterData.width, rasterData.height, rasterData.raster, model);
+    initModelTable("tblModel", model, (updatedModel) => {
+      model = updatedModel;
+      nodes = buildNodes(rasterData.raster, model);
+      renderLandcoverCanvas(
+        landcoverCanvas,
+        rasterData.width,
+        rasterData.height,
+        rasterData.raster,
+        model,
+      );
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to load raster:", err);
+    setStatus("Error loading data");
   });
-}).catch(err => {
-  console.error('Failed to load raster:', err);
-  setStatus('Error loading data');
-});
 
 // ─── Core computation ─────────────────────────────────────────────────────────
 
 function resetTravelTimeCanvas() {
   const { width, height } = rasterData;
-  traveltimeCanvas.width  = width;
+  traveltimeCanvas.width = width;
   traveltimeCanvas.height = height;
-  ttCtx = traveltimeCanvas.getContext('2d');
+  ttCtx = traveltimeCanvas.getContext("2d");
   ttImageData = ttCtx.createImageData(width, height);
   ttCtx.clearRect(0, 0, width, height);
 }
@@ -107,14 +136,15 @@ function compute(x, y) {
   ttCtx.clearRect(0, 0, rasterData.width, rasterData.height);
   ttImageData = ttCtx.createImageData(rasterData.width, rasterData.height);
 
-  const maxSec = parseFloat(maxTimeInput.value || DEFAULT_MAX_TIME_HOURS) * 3600;
-  computeCtx.graph    = new ImageGraph(rasterData.width, rasterData.height, nodes);
+  const maxSec =
+    parseFloat(maxTimeInput.value || DEFAULT_MAX_TIME_HOURS) * 3600;
+  computeCtx.graph = new ImageGraph(rasterData.width, rasterData.height, nodes);
   computeCtx.dijkstra = new Dijkstra(computeCtx.graph, { x, y }, maxSec);
   computeCtx.currentY = 0;
-  computeCtx.yDone    = -1;
+  computeCtx.yDone = -1;
 
   playTravelTimeCanvas(map);
-  setStatus('Computing…');
+  setStatus("Computing…");
   step();
 }
 
@@ -151,9 +181,9 @@ function step() {
       for (let x = 0; x < width; x++) {
         if (row[x] != null) {
           const pos = (x + computeCtx.currentY * width) * 4;
-          const t = Math.round(255 - row[x] / div);  // 255 = near origin, 0 = far
+          const t = Math.round(255 - row[x] / div); // 255 = near origin, 0 = far
           const [r, g, b] = TT_COLOR_LUT[t];
-          ttImageData.data[pos]     = r;
+          ttImageData.data[pos] = r;
           ttImageData.data[pos + 1] = g;
           ttImageData.data[pos + 2] = b;
           ttImageData.data[pos + 3] = 255;
@@ -163,7 +193,10 @@ function step() {
     }
     computeCtx.currentY++;
     if (computeCtx.currentY >= height) computeCtx.currentY = 0;
-  } while (computeCtx.currentY !== computeCtx.yDone && Date.now() - t0 < RENDER_BUDGET_MS);
+  } while (
+    computeCtx.currentY !== computeCtx.yDone &&
+    Date.now() - t0 < RENDER_BUDGET_MS
+  );
 
   if (computeCtx.currentY !== computeCtx.yDone) {
     computeCtx.timerId = window.setTimeout(step, 10);
@@ -175,7 +208,7 @@ function step() {
 
 // ─── Map event handlers ───────────────────────────────────────────────────────
 
-const hoverInfo = document.getElementById('hover-info');
+const hoverInfo = document.getElementById("hover-info");
 
 function handleHover(lngLat) {
   if (!rasterData) return;
@@ -185,8 +218,8 @@ function handleHover(lngLat) {
 
   // Panel badge: show land-cover class name
   const value = rasterData.raster[pos.x + pos.y * width];
-  const type  = model.find(m => m.class === value);
-  hoverInfo.textContent = type?.name ?? '';
+  const type = model.find((m) => m.class === value);
+  hoverInfo.textContent = type?.name ?? "";
 
   compute(pos.x, pos.y);
 }
@@ -198,22 +231,21 @@ function handleClick(map) {
 
   // Build binary grid: 1 where the travel-time overlay has colour (reachable), 0 elsewhere
   const values = new Array(width * height);
-  const data   = ttImageData.data;
+  const data = ttImageData.data;
   for (let i = 0; i < width * height; i++) {
     values[i] = data[i * 4] > 0 ? 1 : 0;
   }
 
   // Extract the single isoline at threshold 1 (catchment boundary)
-  const catchmentContours = contours()
-    .size([width, height])
-    .thresholds([1])
-    (values);
+  const catchmentContours = contours().size([width, height]).thresholds([1])(
+    values,
+  );
 
   // Convert pixel coordinates → WGS84.
   // Offset by -0.5 to correct the half-pixel shift in d3-contour's Marching Squares output.
-  catchmentContours.forEach(contour => {
-    contour.coordinates.forEach(group => {
-      group.forEach(ring => {
+  catchmentContours.forEach((contour) => {
+    contour.coordinates.forEach((group) => {
+      group.forEach((ring) => {
         ring.forEach((c, i) => {
           ring[i] = pixToLngLat(c[0] - 0.5, c[1] - 0.5);
         });
@@ -222,9 +254,9 @@ function handleClick(map) {
   });
 
   currentCatchment = {
-    type: 'FeatureCollection',
-    features: catchmentContours.map(geom => ({
-      type: 'Feature',
+    type: "FeatureCollection",
+    features: catchmentContours.map((geom) => ({
+      type: "Feature",
       properties: {},
       geometry: geom,
     })),
