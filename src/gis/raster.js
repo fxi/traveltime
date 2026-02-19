@@ -10,9 +10,11 @@ export async function loadRaster(url) {
   const image  = await tiff.getImage();
   const rasters = await image.readRasters();
   return {
-    width:  image.getWidth(),
-    height: image.getHeight(),
-    raster: rasters[0],
+    width:      image.getWidth(),
+    height:     image.getHeight(),
+    raster:     rasters[0],
+    origin:     image.getOrigin(),      // [xMin, yNorth, 0] in image CRS
+    resolution: image.getResolution(),  // [xRes, -yRes, 0]  (yRes negative for north-up)
   };
 }
 

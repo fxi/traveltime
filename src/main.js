@@ -1,6 +1,6 @@
 import { DEFAULT_MODEL, DEFAULT_MAX_TIME_HOURS, TIFF_URL, TIME_SLICE_MS, RENDER_BUDGET_MS } from './config.js';
 import { loadRaster, buildNodes, renderLandcoverCanvas } from './gis/raster.js';
-import { latLngToPix, pixToLngLat } from './gis/projection.js';
+import { latLngToPix, pixToLngLat, setGeoref } from './gis/projection.js';
 import { ImageGraph } from './analysis/graph.js';
 import { Dijkstra } from './analysis/dijkstra.js';
 import { createMap, updateIsolineLayer, pauseTravelTimeCanvas, playTravelTimeCanvas } from './ui/map.js';
@@ -68,6 +68,7 @@ setStatus('Loading data…');
 
 loadRaster(TIFF_URL).then(data => {
   rasterData = data;
+  setGeoref(data);   // update projection math from the TIFF's own geotransform
   nodes = buildNodes(data.raster, model);
   renderLandcoverCanvas(landcoverCanvas, data.width, data.height, data.raster, model);
   resetTravelTimeCanvas();

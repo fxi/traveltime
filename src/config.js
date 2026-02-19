@@ -1,15 +1,15 @@
-export const EPSG_PROJECT = 'EPSG:32630';
+export const EPSG_PROJECT = 'EPSG:3857';
 export const EPSG_MAP = 'EPSG:4326';
 
-// Approximate Burkina Faso bounding box — used only for the initial fitBounds
-// before the TIFF has loaded. All precise coordinate math uses setGeoref() values
-// read from the TIFF's own geotransform (pixel-edge convention).
-export const BBX_UTM = [180946.466, 1733383.302, 1151096.521, 998140.887];
+// Bounding box of landcover_3857.tiff in EPSG:3857 (Web Mercator, metres).
+// Format: [xMin, yNorth, xMax, ySouth] — pixel-edge convention.
+// Used as fallback before the TIFF's own geotransform is read by setGeoref().
+export const BBX_UTM = [-665232.623867248767, 1767530.945019772742, 341128.741274, 1003986.271270];
 
-export const CELL_SIZE = [924.833227181229745, 924.833227181232814]; // meters/pixel
+export const CELL_SIZE = [948.502700081797570, 948.502700081797570]; // EPSG:3857 metres/pixel
 
 export const CLASS_NULL = 65535;
-export const TIFF_URL = './landcover.tiff';
+export const TIFF_URL = './landcover_3857.tiff';
 
 export const DEFAULT_MAX_TIME_HOURS = 3;
 export const TIME_SLICE_MS = 80;   // Dijkstra compute budget per step() call
