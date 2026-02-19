@@ -20,10 +20,34 @@ import { initModelTable } from "./ui/table.js";
 import { contours } from "d3-contour";
 import chroma from "chroma-js";
 
+const palette = [
+  "#440154", 
+  "#482878",
+  "#3E4A89",
+  "#31688E",
+  "#26828E",
+  "#1F9E89",
+  "#35B779",
+  "#6CCE59",
+  "#B4DE2C",
+  "#FDE725"  
+];
+
+const palette_1 =  [
+  "#2C3E73",
+  "#2A6F97",
+  "#1CA7C1",
+  "#2DC653",
+  "#80ED99",
+  "#F9C74F",
+  "#F9844A",
+  "#F94144"  
+];
+
+
 // ─── Color ramp for travel time overlay (near → far: red → orange → blue) ────
 const TT_COLOR_LUT = chroma
-  .scale(["#253494", "#2c7fb8", "#41b6c4", "#7fcdbb", "#c7e9b4", "#ffffcc"])
-  .colors(256, "rgb");
+  .scale(palette).colors(256, "rgb");
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
