@@ -7,6 +7,10 @@ import { createMap, updateIsolineLayer, pauseTravelTimeCanvas, playTravelTimeCan
 import { initPanel, setStatus } from './ui/panel.js';
 import { initModelTable } from './ui/table.js';
 import { contours } from 'd3-contour';
+import chroma from 'chroma-js';
+
+// ─── Color ramp for travel time overlay (near → far: red → orange → blue) ────
+const TT_COLOR_LUT = chroma.scale(['#fd01f9','#d53e4f', '#fdae61', '#3288bd','#FFF']).colors(256, 'rgb');
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -147,9 +151,11 @@ function step() {
       for (let x = 0; x < width; x++) {
         if (row[x] != null) {
           const pos = (x + computeCtx.currentY * width) * 4;
-          ttImageData.data[pos]     = 255 - row[x] / div;
-          ttImageData.data[pos + 1] = 0;
-          ttImageData.data[pos + 2] = 0;
+          const t = Math.round(255 - row[x] / div);  // 255 = near origin, 0 = far
+          const [r, g, b] = TT_COLOR_LUT[t];
+          ttImageData.data[pos]     = r;
+          ttImageData.data[pos + 1] = g;
+          ttImageData.data[pos + 2] = b;
           ttImageData.data[pos + 3] = 255;
         }
       }
