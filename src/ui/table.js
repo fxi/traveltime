@@ -11,12 +11,12 @@ export function initModelTable(containerId, model, onChange) {
     layout: 'fitColumns',
     cellEdited: () => onChange(table.getData()),
     columns: [
-      { title: 'Class', field: 'class',     hozAlign: 'right', width: 55 },
-      { title: 'Name',  field: 'name',      editor: 'input',   widthGrow: 2 },
-      { title: 'Speed', field: 'speed',     editor: 'number',  hozAlign: 'right', width: 65,
+      { title: 'Class', field: 'class',     hozAlign: 'right', widthGrow: 1 },
+      { title: 'Name',  field: 'name',      editor: 'input',   widthGrow: 1 },
+      { title: 'Speed', field: 'speed',     editor: 'number',  hozAlign: 'right', widthGrow: 1,
         editorParams: { min: 0, max: 200, step: 0.5 } },
-      { title: 'Mode',  field: 'mode',      editor: 'number',  hozAlign: 'right', width: 50 },
-      { title: 'Color', field: 'color_hex', formatter: 'color', editor: 'input',   width: 55 },
+      { title: 'Mode',  field: 'mode',      editor: 'number',  hozAlign: 'right', widthGrow: 1 },
+      { title: 'Color', field: 'color_hex', formatter: 'color', editor: 'input',  widthGrow: 1 },
     ],
   });
   return table;

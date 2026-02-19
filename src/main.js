@@ -169,20 +169,18 @@ function step() {
 
 // ─── Map event handlers ───────────────────────────────────────────────────────
 
-function handleHover(lngLat, map, popup) {
+const hoverInfo = document.getElementById('hover-info');
+
+function handleHover(lngLat) {
   if (!rasterData) return;
 
   const { width, height } = rasterData;
   const pos = latLngToPix(lngLat, width, height);
 
-  // Tooltip: show land-cover class name
+  // Panel badge: show land-cover class name
   const value = rasterData.raster[pos.x + pos.y * width];
   const type  = model.find(m => m.class === value);
-  if (type) {
-    popup.setLngLat(lngLat).setHTML(type.name).addTo(map);
-  } else {
-    popup.remove();
-  }
+  hoverInfo.textContent = type?.name ?? '';
 
   compute(pos.x, pos.y);
 }

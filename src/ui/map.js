@@ -13,13 +13,11 @@ export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onHo
 
   const map = new maplibregl.Map({
     container: containerId,
-    style: { version: 8, sources: {}, layers: [] },
+    style: 'https://api.maptiler.com/maps/outdoor-v4/style.json?key=sZ1OmwWx9EEcSEyGWBa8',
     center: [0, 0],
     zoom: 3,
     preserveDrawingBuffer: true,
   });
-
-  const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
 
   map.on('load', () => {
     map.fitBounds(getRasterBounds());
@@ -44,14 +42,14 @@ export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onHo
       source: 'canvas-landcover',
       type: 'raster',
       paint: { 'raster-opacity': 1 },
-    });
+    }, 'Tunnel path');
 
     map.addLayer({
       id: 'traveltime',
       source: 'canvas-traveltime',
       type: 'raster',
       paint: { 'raster-opacity': 0.7 },
-    });
+    }, 'Tunnel path');
 
     // Catchment boundary — visible red outline with faint fill
     map.addLayer({
@@ -67,9 +65,8 @@ export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onHo
       },
     });
 
-    map.on('mousemove', e => onHover(e.lngLat, map, popup));
+    map.on('mousemove', e => onHover(e.lngLat));
     map.on('click',     () => onClick(map));
-    map.on('mouseleave', () => popup.remove());
   });
 
   return map;

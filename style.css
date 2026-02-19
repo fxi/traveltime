@@ -19,9 +19,6 @@ html, body {
   cursor: crosshair;
 }
 
-#map .maplibregl-popup {
-  pointer-events: none;
-}
 
 /* ── Bottom panel ─────────────────────────────────────────────────────────── */
 
@@ -136,7 +133,7 @@ html, body {
 /* ── Panel body (collapsible table area) ─────────────────────────────────── */
 
 #panel-body {
-  padding: 0 10px 10px;
+  padding: 6px 10px 10px;
   border-top: 1px solid #e5e5e5;
 }
 
@@ -176,5 +173,21 @@ html, body {
 }
 
 .tabulator-cell {
-  padding: 2px 6px !important;
+  padding: 3px 8px !important;
+}
+
+/* ── Hover info badge ─────────────────────────────────────────────────────── */
+
+#hover-info {
+  font-size: 11px;
+  color: #fff;
+  background: #374151;
+  border-radius: 3px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  display: none;
+}
+
+#hover-info:not(:empty) {
+  display: inline-block;
 }
