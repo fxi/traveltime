@@ -1,0 +1,9 @@
+{
+  "name": "traveltime",
+  "description": "Client-side travel time analysis with Dijkstra algorithm",
+  "tags": ["map", "mapbox", "gis", "analysis"],
+  "year_init": 2018,
+  "year_last": 2025,
+  "url": "https://fxi.io/traveltime/",
+  "featured": false
+}

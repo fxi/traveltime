@@ -1,0 +1,180 @@
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font: 13px/1.5 system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+}
+
+/* Map fills the entire viewport */
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+#map canvas {
+  cursor: crosshair;
+}
+
+#map .maplibregl-popup {
+  pointer-events: none;
+}
+
+/* ── Bottom panel ─────────────────────────────────────────────────────────── */
+
+#panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.15);
+  border-radius: 8px 8px 0 0;
+  z-index: 10;
+  transition: transform 0.25s ease;
+}
+
+/* Collapsed: slide down, only the handle (40px) peeks out */
+#panel.collapsed {
+  transform: translateY(calc(100% - 40px));
+}
+
+/* ── Panel handle (always visible) ───────────────────────────────────────── */
+
+#panel-handle {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 8px 8px 0 0;
+  gap: 16px;
+}
+
+#panel-handle:hover {
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.handle-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.handle-title strong {
+  font-size: 13px;
+}
+
+.handle-title small {
+  color: #777;
+  font-size: 11px;
+}
+
+.handle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.handle-right label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  white-space: nowrap;
+}
+
+#maxTimeHour {
+  width: 60px;
+  padding: 3px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+#btnDownload {
+  padding: 4px 10px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+#btnDownload:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+#btnDownload:disabled {
+  background: #9ca3af;
+  cursor: default;
+}
+
+#panel-arrow {
+  font-size: 11px;
+  color: #888;
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+#panel.collapsed #panel-arrow {
+  transform: rotate(180deg);
+}
+
+/* ── Panel body (collapsible table area) ─────────────────────────────────── */
+
+#panel-body {
+  padding: 0 10px 10px;
+  border-top: 1px solid #e5e5e5;
+}
+
+/* ── Status indicator ─────────────────────────────────────────────────────── */
+
+#status {
+  position: absolute;
+  bottom: 32px;
+  right: 10px;
+  z-index: 11;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: none;
+}
+
+#status.visible {
+  display: block;
+}
+
+/* ── Tabulator overrides (compact, full-width) ────────────────────────────── */
+
+.tabulator {
+  font-size: 12px !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.tabulator .tabulator-header .tabulator-col {
+  background: #f9fafb !important;
+}
+
+.tabulator-row {
+  min-height: 24px !important;
+}
+
+.tabulator-cell {
+  padding: 2px 6px !important;
+}

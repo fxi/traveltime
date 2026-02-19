@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Time</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="panel">
+    <!-- Clickable handle — always visible, toggles the body -->
+    <div id="panel-handle">
+      <div class="handle-title">
+        <strong>Travel Time Analysis</strong>
+        <small>Hover map to compute &middot; Click to capture catchment</small>
+      </div>
+      <div class="handle-right">
+        <label for="maxTimeHour">Max time (h)</label>
+        <input type="number" id="maxTimeHour" value="3" min="0.5" max="24" step="0.5">
+        <button id="btnDownload" disabled>Download GeoJSON</button>
+        <span id="panel-arrow">&#9650;</span>
+      </div>
+    </div>
+
+    <!-- Collapsible table area -->
+    <div id="panel-body">
+      <div id="tblModel"></div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
