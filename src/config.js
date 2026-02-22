@@ -15,6 +15,17 @@ export const DEFAULT_MAX_TIME_HOURS = 3;
 export const TIME_SLICE_MS = 80;   // Dijkstra compute budget per step() call
 export const RENDER_BUDGET_MS = 100; // Total step() time budget
 
+export const MARKER_COLORS = [
+  '#e6194b', // red
+  '#3cb44b', // green
+  '#4363d8', // blue
+  '#f58231', // orange
+  '#911eb4', // purple
+  '#42d4f4', // cyan
+  '#f032e6', // magenta
+  '#bfef45', // lime
+];
+
 export const DEFAULT_MODEL = [
   { class: 1,    name: 'Bare areas',              speed: 2.5,  mode: 1, color_hex: '#1a4cf6' },
   { class: 2,    name: 'Urban',                   speed: 2.5,  mode: 1, color_hex: '#a07d60' },

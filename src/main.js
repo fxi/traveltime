@@ -4,6 +4,7 @@ import {
   TIFF_URL,
   TIME_SLICE_MS,
   RENDER_BUDGET_MS,
+  MARKER_COLORS,
 } from "./config.js";
 import { loadRaster, buildNodes, renderLandcoverCanvas } from "./gis/raster.js";
 import { latLngToPix, pixToLngLat, setGeoref } from "./gis/projection.js";
@@ -11,6 +12,7 @@ import { ImageGraph } from "./analysis/graph.js";
 import { Dijkstra } from "./analysis/dijkstra.js";
 import {
   createMap,
+  createMarker,
   updateIsolineLayer,
   pauseTravelTimeCanvas,
   playTravelTimeCanvas,
@@ -66,13 +68,16 @@ let ttImageData = null;
 // GeoJSON of the last computed catchment (for download)
 let currentCatchment = null;
 
-// Computation context (Dijkstra loop state)
-const computeCtx = {
-  dijkstra: null,
-  graph: null,
+// Multi-origin state: array of { id, marker, color, colorRGB, dijkstra, graph, distances }
+const origins = [];
+let nextOriginId = 0;
+
+// Render loop state
+const renderCtx = {
   currentY: 0,
   yDone: -1,
   timerId: null,
+  computing: false, // true while any origin is still computing
 };
 
 // ─── UI references ────────────────────────────────────────────────────────────
@@ -101,8 +106,7 @@ btnDownload.addEventListener("click", () => {
 // ─── Map ──────────────────────────────────────────────────────────────────────
 
 const map = createMap("map", landcoverCanvas, traveltimeCanvas, {
-  onHover: handleHover,
-  onClick: handleClick,
+  onMapClick: handleMapClick,
 });
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
@@ -152,20 +156,44 @@ function resetTravelTimeCanvas() {
   ttCtx.clearRect(0, 0, width, height);
 }
 
-function compute(x, y) {
-  if (!rasterData || !nodes) return;
-  clearTimeout(computeCtx.timerId);
+/**
+ * Build a 256-entry color ramp for a given origin color.
+ * Near origin (index 255) = lighter, far (index 0) = darker/saturated.
+ */
+function buildColorRamp(baseColor) {
+  return chroma
+    .scale([chroma(baseColor).darken(1.5), baseColor, chroma(baseColor).brighten(1)])
+    .colors(256, "rgb");
+}
 
-  // Clear the travel-time canvas for the new computation
+/**
+ * Compute travel time distances for a single origin.
+ * @param {object} origin - Origin object from origins array
+ * @param {number} x - Pixel x coordinate
+ * @param {number} y - Pixel y coordinate
+ */
+function computeOrigin(origin, x, y) {
+  if (!rasterData || !nodes) return;
+
+  const maxSec = parseFloat(maxTimeInput.value || DEFAULT_MAX_TIME_HOURS) * 3600;
+  origin.graph = new ImageGraph(rasterData.width, rasterData.height, nodes);
+  origin.dijkstra = new Dijkstra(origin.graph, { x, y }, maxSec);
+  origin.done = false;
+}
+
+/**
+ * Start or restart the render loop for all origins.
+ */
+function startRenderLoop() {
+  clearTimeout(renderCtx.timerId);
+
+  // Clear the travel-time canvas
   ttCtx.clearRect(0, 0, rasterData.width, rasterData.height);
   ttImageData = ttCtx.createImageData(rasterData.width, rasterData.height);
 
-  const maxSec =
-    parseFloat(maxTimeInput.value || DEFAULT_MAX_TIME_HOURS) * 3600;
-  computeCtx.graph = new ImageGraph(rasterData.width, rasterData.height, nodes);
-  computeCtx.dijkstra = new Dijkstra(computeCtx.graph, { x, y }, maxSec);
-  computeCtx.currentY = 0;
-  computeCtx.yDone = -1;
+  renderCtx.currentY = 0;
+  renderCtx.yDone = -1;
+  renderCtx.computing = true;
 
   playTravelTimeCanvas(map);
   setStatus("Computing…");
@@ -173,119 +201,285 @@ function compute(x, y) {
 }
 
 /**
- * Incremental computation + rendering loop (time-sliced to keep the UI responsive).
+ * Incremental computation + rendering loop for multiple origins.
  *
- * Phase 1 — Dijkstra: runs for up to TIME_SLICE_MS per call.
- * Phase 2 — Render:   paints computed rows into the travel-time canvas.
- *
- * The canvas is rendered in a scan-line pass that wraps around:
- * when Dijkstra finishes at row Y, yDone is set to Y.
- * The render loop then continues until currentY wraps back to Y,
- * guaranteeing every row is painted exactly once.
+ * Phase 1 — Dijkstra: runs each origin's Dijkstra for up to TIME_SLICE_MS total.
+ * Phase 2 — Render: paints computed rows, choosing closest origin for each pixel.
  */
 function step() {
-  if (!computeCtx.dijkstra) return;
-
   const t0 = Date.now();
   const { width, height } = rasterData;
 
-  // Dijkstra phase
-  while (computeCtx.yDone === -1 && Date.now() - t0 < TIME_SLICE_MS) {
-    if (computeCtx.dijkstra.step()) {
-      computeCtx.yDone = computeCtx.currentY;
+  // Dijkstra phase: advance all origins that aren't done
+  let allDone = true;
+  for (const origin of origins) {
+    if (origin.done || !origin.dijkstra) continue;
+    allDone = false;
+
+    while (Date.now() - t0 < TIME_SLICE_MS) {
+      if (origin.dijkstra.step()) {
+        origin.done = true;
+        // Store final distances array reference
+        origin.distances = origin.graph.distances;
+        origin.maxDistance = origin.dijkstra.maxDistance;
+        break;
+      }
     }
   }
 
-  // Render phase
-  const div = computeCtx.dijkstra.maxDistance / 255.0 || 1;
+  // Check if all origins are now complete
+  if (allDone && renderCtx.computing) {
+    renderCtx.yDone = renderCtx.currentY;
+    renderCtx.computing = false;
+  }
 
+  // Find global max distance for normalization
+  let globalMaxDist = 0;
+  for (const origin of origins) {
+    if (origin.maxDistance > globalMaxDist) {
+      globalMaxDist = origin.maxDistance;
+    }
+  }
+  const div = globalMaxDist / 255.0 || 1;
+
+  // Render phase: for each pixel, find closest origin and use its color
   do {
-    const row = computeCtx.graph.distances[computeCtx.currentY];
-    if (row != null) {
-      for (let x = 0; x < width; x++) {
-        if (row[x] != null) {
-          const pos = (x + computeCtx.currentY * width) * 4;
-          const t = Math.round(255 - row[x] / div); // 255 = near origin, 0 = far
-          const [r, g, b] = TT_COLOR_LUT[t];
-          ttImageData.data[pos] = r;
-          ttImageData.data[pos + 1] = g;
-          ttImageData.data[pos + 2] = b;
-          ttImageData.data[pos + 3] = 255;
+    for (let x = 0; x < width; x++) {
+      let minDist = Infinity;
+      let closestOrigin = null;
+
+      for (const origin of origins) {
+        if (!origin.distances) continue;
+        const row = origin.distances[renderCtx.currentY];
+        if (row && row[x] != null && row[x] < minDist) {
+          minDist = row[x];
+          closestOrigin = origin;
         }
       }
-      ttCtx.putImageData(ttImageData, 0, 0, 0, computeCtx.currentY, width, 1);
+
+      if (closestOrigin) {
+        const pos = (x + renderCtx.currentY * width) * 4;
+        const t = Math.round(255 - minDist / div); // 255 = near origin, 0 = far
+        const [r, g, b] = closestOrigin.colorRamp[Math.max(0, Math.min(255, t))];
+        ttImageData.data[pos] = r;
+        ttImageData.data[pos + 1] = g;
+        ttImageData.data[pos + 2] = b;
+        ttImageData.data[pos + 3] = 255;
+      }
     }
-    computeCtx.currentY++;
-    if (computeCtx.currentY >= height) computeCtx.currentY = 0;
+    ttCtx.putImageData(ttImageData, 0, 0, 0, renderCtx.currentY, width, 1);
+
+    renderCtx.currentY++;
+    if (renderCtx.currentY >= height) renderCtx.currentY = 0;
   } while (
-    computeCtx.currentY !== computeCtx.yDone &&
+    renderCtx.currentY !== renderCtx.yDone &&
     Date.now() - t0 < RENDER_BUDGET_MS
   );
 
-  if (computeCtx.currentY !== computeCtx.yDone) {
-    computeCtx.timerId = window.setTimeout(step, 10);
+  if (renderCtx.currentY !== renderCtx.yDone || renderCtx.computing) {
+    renderCtx.timerId = window.setTimeout(step, 10);
   } else {
+    renderCtx.timerId = null;
     pauseTravelTimeCanvas(map);
+    updateCatchments();
     setStatus(null);
   }
 }
 
 // ─── Map event handlers ───────────────────────────────────────────────────────
 
-const hoverInfo = document.getElementById("hover-info");
-
-function handleHover(lngLat) {
+/**
+ * Handle map click: add a new marker origin.
+ */
+function handleMapClick(lngLat) {
   if (!rasterData) return;
+
+  // Max 8 markers (limited by color palette)
+  if (origins.length >= MARKER_COLORS.length) return;
 
   const { width, height } = rasterData;
   const pos = latLngToPix(lngLat, width, height);
 
-  // Panel badge: show land-cover class name
-  const value = rasterData.raster[pos.x + pos.y * width];
-  const type = model.find((m) => m.class === value);
-  hoverInfo.textContent = type?.name ?? "";
+  // Check if click is within raster bounds
+  if (pos.x < 0 || pos.x >= width || pos.y < 0 || pos.y >= height) return;
 
-  compute(pos.x, pos.y);
+  const id = nextOriginId++;
+  const colorIdx = origins.length;
+  const color = MARKER_COLORS[colorIdx];
+
+  const origin = {
+    id,
+    marker: null,
+    color,
+    colorRamp: buildColorRamp(color),
+    dijkstra: null,
+    graph: null,
+    distances: null,
+    maxDistance: 0,
+    done: false,
+    pixX: pos.x,
+    pixY: pos.y,
+  };
+
+  // Create draggable marker
+  origin.marker = createMarker(map, lngLat, color, {
+    onDrag: (newLngLat) => handleMarkerDrag(origin, newLngLat),
+    onDragEnd: (newLngLat) => handleMarkerDragEnd(origin, newLngLat),
+    onClick: () => handleMarkerClick(origin),
+  });
+
+  origins.push(origin);
+
+  // Compute travel time for this origin
+  computeOrigin(origin, pos.x, pos.y);
+  startRenderLoop();
 }
 
-function handleClick(map) {
-  if (!rasterData || !ttImageData) return;
-
+/**
+ * Handle marker drag: recompute that origin's distances (throttled via render loop).
+ */
+function handleMarkerDrag(origin, lngLat) {
   const { width, height } = rasterData;
+  const pos = latLngToPix(lngLat, width, height);
 
-  // Build binary grid: 1 where the travel-time overlay has colour (reachable), 0 elsewhere
-  const values = new Array(width * height);
-  const data = ttImageData.data;
-  for (let i = 0; i < width * height; i++) {
-    values[i] = data[i * 4] > 0 ? 1 : 0;
+  if (pos.x < 0 || pos.x >= width || pos.y < 0 || pos.y >= height) return;
+
+  origin.pixX = pos.x;
+  origin.pixY = pos.y;
+  computeOrigin(origin, pos.x, pos.y);
+
+  // Only start render loop if not already running
+  if (!renderCtx.computing && renderCtx.timerId === null) {
+    startRenderLoop();
+  }
+}
+
+/**
+ * Handle marker drag end: final computation.
+ */
+function handleMarkerDragEnd(origin, lngLat) {
+  handleMarkerDrag(origin, lngLat);
+}
+
+/**
+ * Handle marker click: remove the marker and its origin.
+ */
+function handleMarkerClick(origin) {
+  // Remove marker from map
+  origin.marker.remove();
+
+  // Remove from origins array
+  const idx = origins.indexOf(origin);
+  if (idx > -1) {
+    origins.splice(idx, 1);
   }
 
-  // Extract the single isoline at threshold 1 (catchment boundary)
-  const catchmentContours = contours().size([width, height]).thresholds([1])(
-    values,
-  );
+  // Reassign colors to maintain order
+  origins.forEach((o, i) => {
+    o.color = MARKER_COLORS[i];
+    o.colorRamp = buildColorRamp(o.color);
+    // Update marker color
+    const el = o.marker.getElement();
+    const svg = el.querySelector("svg");
+    if (svg) {
+      const path = svg.querySelector("path");
+      if (path) path.setAttribute("fill", o.color);
+    }
+  });
 
-  // Convert pixel coordinates → WGS84.
-  // Offset by -0.5 to correct the half-pixel shift in d3-contour's Marching Squares output.
-  catchmentContours.forEach((contour) => {
-    contour.coordinates.forEach((group) => {
-      group.forEach((ring) => {
-        ring.forEach((c, i) => {
-          ring[i] = pixToLngLat(c[0] - 0.5, c[1] - 0.5);
+  if (origins.length === 0) {
+    // Clear the canvas
+    clearTimeout(renderCtx.timerId);
+    renderCtx.timerId = null;
+    ttCtx.clearRect(0, 0, rasterData.width, rasterData.height);
+    ttImageData = ttCtx.createImageData(rasterData.width, rasterData.height);
+    updateIsolineLayer(map, { type: "FeatureCollection", features: [] });
+    btnDownload.disabled = true;
+    currentCatchment = null;
+    setStatus(null);
+  } else {
+    // Re-render with remaining origins
+    startRenderLoop();
+  }
+}
+
+/**
+ * Extract and update catchment boundaries for download.
+ * Creates per-origin catchment features with origin point as property.
+ */
+function updateCatchments() {
+  if (!rasterData || origins.length === 0) return;
+
+  const { width, height } = rasterData;
+  const features = [];
+
+  // For each origin, create a binary mask of pixels belonging to it
+  for (const origin of origins) {
+    if (!origin.distances) continue;
+
+    const values = new Array(width * height).fill(0);
+
+    // Mark pixels that belong to this origin (closest)
+    for (let y = 0; y < height; y++) {
+      const row = origin.distances[y];
+      if (!row) continue;
+
+      for (let x = 0; x < width; x++) {
+        if (row[x] == null) continue;
+
+        // Check if this origin is closest to this pixel
+        let isClosest = true;
+        const dist = row[x];
+
+        for (const other of origins) {
+          if (other === origin || !other.distances) continue;
+          const otherRow = other.distances[y];
+          if (otherRow && otherRow[x] != null && otherRow[x] < dist) {
+            isClosest = false;
+            break;
+          }
+        }
+
+        if (isClosest) {
+          values[x + y * width] = 1;
+        }
+      }
+    }
+
+    // Extract contour for this origin's catchment
+    const catchmentContours = contours().size([width, height]).thresholds([1])(
+      values,
+    );
+
+    // Get origin point in WGS84
+    const originLngLat = pixToLngLat(origin.pixX, origin.pixY);
+
+    // Convert pixel coordinates → WGS84 and create features
+    catchmentContours.forEach((contour) => {
+      contour.coordinates.forEach((group) => {
+        group.forEach((ring) => {
+          ring.forEach((c, i) => {
+            ring[i] = pixToLngLat(c[0] - 0.5, c[1] - 0.5);
+          });
         });
       });
+
+      features.push({
+        type: "Feature",
+        properties: {
+          origin: originLngLat,
+          color: origin.color,
+        },
+        geometry: contour,
+      });
     });
-  });
+  }
 
   currentCatchment = {
     type: "FeatureCollection",
-    features: catchmentContours.map((geom) => ({
-      type: "Feature",
-      properties: {},
-      geometry: geom,
-    })),
+    features,
   };
 
   updateIsolineLayer(map, currentCatchment);
-  btnDownload.disabled = false;
+  btnDownload.disabled = features.length === 0;
 }

@@ -5,10 +5,9 @@ import { getRasterBounds, getRasterCorners } from '../gis/projection.js';
 /**
  * Creates and returns a MapLibre map with canvas overlay sources pre-configured.
  * Callbacks:
- *   onHover(lngLat, map, popup) — fires on mousemove
- *   onClick(map)                — fires on click
+ *   onMapClick(lngLat) — fires on click (for placing markers)
  */
-export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onHover, onClick }) {
+export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onMapClick }) {
   const corners = getRasterCorners();
 
   const map = new maplibregl.Map({
@@ -65,8 +64,7 @@ export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onHo
       },
     });
 
-    map.on('mousemove', e => onHover(e.lngLat));
-    map.on('click',     () => onClick(map));
+    map.on('click', e => onMapClick(e.lngLat));
   });
 
   return map;
@@ -85,4 +83,32 @@ export function pauseTravelTimeCanvas(map) {
 /** Resumes canvas re-reading for animated updates during Dijkstra computation. */
 export function playTravelTimeCanvas(map) {
   map.getSource('canvas-traveltime')?.play?.();
+}
+
+/**
+ * Creates a draggable marker at the given location.
+ * @param {maplibregl.Map} map - MapLibre map instance
+ * @param {LngLat} lngLat - Position for the marker
+ * @param {string} color - Marker color (hex)
+ * @param {object} callbacks - { onDrag, onDragEnd, onClick }
+ * @returns {maplibregl.Marker}
+ */
+export function createMarker(map, lngLat, color, { onDrag, onDragEnd, onClick }) {
+  const marker = new maplibregl.Marker({
+    color,
+    draggable: true,
+  })
+    .setLngLat(lngLat)
+    .addTo(map);
+
+  marker.on('drag', () => onDrag(marker.getLngLat()));
+  marker.on('dragend', () => onDragEnd(marker.getLngLat()));
+
+  // Click on marker element to remove it
+  marker.getElement().addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent map click
+    onClick();
+  });
+
+  return marker;
 }
