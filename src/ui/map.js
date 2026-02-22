@@ -40,14 +40,20 @@ export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onMa
       id: 'landcover',
       source: 'canvas-landcover',
       type: 'raster',
-      paint: { 'raster-opacity': 1 },
+      paint: {
+        'raster-opacity': 1,
+        'raster-resampling': 'nearest',
+      },
     }, 'Tunnel path');
 
     map.addLayer({
       id: 'traveltime',
       source: 'canvas-traveltime',
       type: 'raster',
-      paint: { 'raster-opacity': 0.7 },
+      paint: {
+        'raster-opacity': 0.7,
+        'raster-resampling': 'nearest',
+      },
     }, 'Tunnel path');
 
     // Catchment boundary — visible red outline with faint fill
