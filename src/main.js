@@ -162,7 +162,11 @@ function resetTravelTimeCanvas() {
  */
 function buildColorRamp(baseColor) {
   return chroma
-    .scale([chroma(baseColor).darken(1.5), baseColor, chroma(baseColor).brighten(1)])
+    .scale([
+      chroma(baseColor).darken(1.2).saturate(0.5),
+      chroma(baseColor).saturate(0.5),
+      chroma(baseColor).brighten(0.6).saturate(1),
+    ])
     .colors(256, "rgb");
 }
 
@@ -176,7 +180,7 @@ function computeOrigin(origin, x, y) {
   if (!rasterData || !nodes) return;
 
   const maxSec = parseFloat(maxTimeInput.value || DEFAULT_MAX_TIME_HOURS) * 3600;
-  origin.graph = new ImageGraph(rasterData.width, rasterData.height, nodes);
+  origin.graph = new ImageGraph(rasterData.width, rasterData.height, nodes, Math.abs(rasterData.resolution[0]));
   origin.dijkstra = new Dijkstra(origin.graph, { x, y }, maxSec);
   origin.done = false;
 }

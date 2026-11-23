@@ -1,5 +1,3 @@
-import { CELL_SIZE } from '../config.js';
-
 const SQRT2 = Math.SQRT2;
 
 /**
@@ -8,10 +6,11 @@ const SQRT2 = Math.SQRT2;
  * Nodes is the flat pixel array from buildNodes(), each element has .speed (km/h) or 0 for barriers.
  */
 export class ImageGraph {
-  constructor(width, height, nodes) {
+  constructor(width, height, nodes, cellSize) {
     this.width  = width;
     this.height = height;
     this.nodes  = nodes;
+    this.cellSize = cellSize; // metres per pixel, from the TIFF geotransform
     this.distances = [];
   }
 
@@ -35,7 +34,7 @@ export class ImageGraph {
     if (node.speed) {
       // cost = distance (m) → km → hours → seconds
       result.push({
-        cost: (CELL_SIZE[0] / 1000 / node.speed) * 3600 * mult,
+        cost: (this.cellSize / 1000 / node.speed) * 3600 * mult,
         node: { x, y },
       });
     }

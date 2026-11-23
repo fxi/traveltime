@@ -51,7 +51,7 @@ export function createMap(containerId, landcoverCanvas, traveltimeCanvas, { onMa
       source: 'canvas-traveltime',
       type: 'raster',
       paint: {
-        'raster-opacity': 0.7,
+        'raster-opacity': 0.85,
         'raster-resampling': 'nearest',
       },
     }, 'Tunnel path');
